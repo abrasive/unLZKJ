@@ -16,18 +16,17 @@ def lz_init_tab():
 
     return tab
 
-def lz_decompress(filename):
-    with open(filename, 'rb') as fp:
-        header = fp.read(0x1c)
+def lz_decompress(fp):
+    header = fp.read(0x1c)
 
-        assert header[:4] == b'LZKJ'
-        assert header[0xc:0xe] == b'LZ'   # 'CP' also supported by the game
-        compressed_len, uncompressed_len, name_len = struct.unpack('<LLL', header[0x10:0x1c])
-        name_align = (name_len+3) & ~3
-        name = fp.read(name_align)[:name_len]
-        print('decompressing:', name.decode('ascii'))
+    assert header[:4] == b'LZKJ'
+    assert header[0xc:0xe] == b'LZ'   # 'CP' also supported by the game
+    compressed_len, uncompressed_len, name_len = struct.unpack('<LLL', header[0x10:0x1c])
+    name_align = (name_len+3) & ~3
+    name = fp.read(name_align)[:name_len]
+    print('decompressing:', name.decode('ascii'))
 
-        data = fp.read(compressed_len)
+    data = fp.read(compressed_len)
 
     lz_tab = lz_init_tab()
 
@@ -89,16 +88,19 @@ def lz_decompress(filename):
 
     return name, out
 
+def archive_decompress(filename):
+    with open(filename, 'rb') as fp:
+        header_len = struct.unpack('<L', fp.read(4))[0]
+        offsets = [header_len]
+        while fp.tell() < header_len:
+            offsets.append(struct.unpack('<L', fp.read(4))[0])
+
+        for offset in offsets:
+            fp.seek(offset)
+            name, data = lz_decompress(fp)
+            open(name, 'wb').write(data)
+
+
 if __name__ == "__main__":
     import sys
-
-    if len(sys.argv) not in [2, 3]:
-        print(f"usage: {sys.argv[0]} infile.lz [outfile.pvr]")
-        sys.exit(1)
-
-    outfile, data = lz_decompress(sys.argv[1])
-
-    if len(sys.argv) == 3:
-        outfile = sys.argv[2]
-
-    open(outfile, 'wb').write(data)
+    archive_decompress(sys.argv[1])
