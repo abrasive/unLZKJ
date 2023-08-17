@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import struct
-import png
+import png  # pypi package: pypng
 import sys
 
 def twiddle(x, y):
