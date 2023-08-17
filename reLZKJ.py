@@ -27,13 +27,24 @@ def lz_compress(queue):
         best_match_start = None
         best_match_len = 1   # don't make backrefs that are longer than literals
 
+        run_limit = 0
+
         for match_start in find_all_chars(window, queue[:2]):
+            if match_start < run_limit:
+                continue
+
             backref = itertools.cycle(window[match_start:])
             match_len = 0
+            run = 1
             while (match_len < len(queue)
                    and match_len < 0x110 + 0xffff
                    and queue[match_len] == next(backref)):
+                if run and queue[match_len] != queue[0]:
+                    run = 0
                 match_len += 1
+
+            if run:
+                run_limit = match_start + match_len
 
             if match_len > best_match_len:
                 best_match_start = match_start
