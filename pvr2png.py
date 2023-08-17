@@ -48,27 +48,27 @@ if pixfmt == 0:
     colour_entries = 4
     png_format = 'RGBA'
     def unpack(row, x, packed):
-        row[x*4] = ((packed >> 10) & 0x1f) << 3
-        row[x*4 + 1] = ((packed >> 5) & 0x1f) << 3
-        row[x*4 + 2] = (packed & 0x1f) << 3
-        row[x*4 + 3] = (packed >> 15) << 7
+        row[x*4] = int(round(((packed >> 10) & 0x1f) / 0x1f * 255))
+        row[x*4 + 1] = int(round(((packed >> 5) & 0x1f) / 0x1f * 255))
+        row[x*4 + 2] = int(round((packed & 0x1f) / 0x1f * 255))
+        row[x*4 + 3] = int(round((packed >> 15) * 255))
 
 elif pixfmt == 1:
     colour_entries = 3
     png_format = 'RGB'
     def unpack(row, x, packed):
-        row[x*3] = (packed >> 11) << 3
-        row[x*3 + 1] = ((packed >> 5) & 0x3f) << 2
-        row[x*3 + 2] = (packed & 0x1f) << 3
+        row[x*3] = int(round((packed >> 11) / 0x1f * 255))
+        row[x*3 + 1] = int(round(((packed >> 5) & 0x3f) / 0x3f * 255))
+        row[x*3 + 2] = int(round((packed & 0x1f) / 0x1f * 255))
 
 elif pixfmt == 2:
     colour_entries = 4
     png_format = 'RGBA'
     def unpack(row, x, packed):
-        row[x*4] = ((packed >> 8) & 0xf) << 4
-        row[x*4 + 1] = ((packed >> 4) & 0xf) << 4
-        row[x*4 + 2] = (packed & 0xf) << 4
-        row[x*4 + 3] = (packed >> 12) << 4
+        row[x*4] = int(round(((packed >> 8) & 0xf) / 0xf * 255))
+        row[x*4 + 1] = int(round(((packed >> 4) & 0xf) / 0xf * 255))
+        row[x*4 + 2] = int(round((packed & 0xf) / 0xf * 255))
+        row[x*4 + 3] = int(round((packed >> 12) / 0xf * 255))
 
 else:
     raise ValueError(f"unsupported pixel format {pixfmt}")
