@@ -44,7 +44,6 @@ def lz_decompress(fp):
 
     lz_index_w = 0
     out = bytearray()
-    fo = open('test.bin', 'wb')
 
     while len(out) < uncompressed_len:
         actions >>= 1
