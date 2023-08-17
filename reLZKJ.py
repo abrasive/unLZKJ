@@ -22,7 +22,6 @@ def lz_compress(queue):
     ops = []
 
     t = tqdm.tqdm(total=len(queue), unit='byte', unit_scale=1, unit_divisor=1024, leave=False)
-    bytes_done = 0
     while len(queue):
         best_match_start = None
         best_match_len = 1   # don't make backrefs that are longer than literals
@@ -37,11 +36,18 @@ def lz_compress(queue):
             match_len = 0
             run = 1
             while (match_len < len(queue)
-                   and match_len < 0x110 + 0xffff
+                   and match_len < 0x110 + 0xfffe
                    and queue[match_len] == next(backref)):
                 if run and queue[match_len] != queue[0]:
                     run = 0
                 match_len += 1
+
+            if match_len > 8:
+                for start in range(2, match_len, 2):
+                    if queue[start:start+2] != queue[:2]:
+                        break
+                else:
+                    run_limit = match_start + match_len
 
             if run:
                 run_limit = match_start + match_len
