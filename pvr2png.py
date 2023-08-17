@@ -27,26 +27,70 @@ if len(sys.argv) == 2:
     sys.argv.append(sys.argv[1][:-4] + '.png')
 
 with open(sys.argv[1], 'rb') as fp:
+    header = fp.read(0x20)
+    assert header[:4] == b'GBIX'
+    # not implemented: actual global index contents
+    assert header[0x10:0x14] == b'PVRT'  # perverts only
+
+    pixfmt = header[0x18]
+    dtype = header[0x19]
+
+    assert pixfmt in [0, 1, 2] # ARGB1555, RGB565, ARGB4444
+    assert dtype in [1, 0xd] # square twiddled, rectangular twiddled
+
+    width, height  = struct.unpack('<HH', header[0x1c:0x20])
+
     fp.seek(0x20)
     raw_bytes = fp.read()
     raw = struct.unpack(f'<{len(raw_bytes)//2}H', raw_bytes)
 
+if pixfmt == 0:
+    colour_entries = 4
+    png_format = 'RGBA'
+    def unpack(row, x, packed):
+        row[x*4] = ((packed >> 10) & 0x1f) << 3
+        row[x*4 + 1] = ((packed >> 5) & 0x1f) << 3
+        row[x*4 + 2] = (packed & 0x1f) << 3
+        row[x*4 + 3] = (packed >> 15) << 7
+
+elif pixfmt == 1:
+    colour_entries = 3
+    png_format = 'RGB'
+    def unpack(row, x, packed):
+        row[x*3] = (packed >> 11) << 3
+        row[x*3 + 1] = ((packed >> 5) & 0x3f) << 2
+        row[x*3 + 2] = (packed & 0x1f) << 3
+
+elif pixfmt == 2:
+    colour_entries = 4
+    png_format = 'RGBA'
+    def unpack(row, x, packed):
+        row[x*4] = ((packed >> 8) & 0xf) << 4
+        row[x*4 + 1] = ((packed >> 4) & 0xf) << 4
+        row[x*4 + 2] = (packed & 0xf) << 4
+        row[x*4 + 3] = (packed >> 12) << 4
+
+else:
+    raise ValueError(f"unsupported pixel format {pixfmt}")
+
 image = []
-for row in range(512):
-    image.append([0]*(3*512))
+for row in range(height):
+    image.append([0]*(colour_entries*width))
 
-for x in range(512):
-    for y in range(512):
-        z = twiddle(y, x)
+stride = min(width, height)
 
-        if z < len(raw):
-            rawval = raw[z]
-            row = image[y]
-            r = (rawval >> 11) << 3
-            g = ((rawval >> 5) & 0x3f) << 2
-            b = (rawval & 0x1f) << 3
-            row[x*3] = r
-            row[x*3 + 1] = g
-            row[x*3 + 2] = b
+block_offset = 0
+for x0 in range(0, width, stride):
+    for y0 in range(0, height, stride):
+        for x in range(stride):
+            for y in range(stride):
+                z = twiddle(y, x) + block_offset
 
-png.from_array(image, 'RGB').save(sys.argv[2])
+                if z < len(raw):
+                    rawval = raw[z]
+                    row = image[y0+y]
+                    unpack(row, x0+x, rawval)
+
+        block_offset += stride*stride
+
+png.from_array(image, png_format).save(sys.argv[2])
