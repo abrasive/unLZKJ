@@ -22,7 +22,7 @@ def lz_decompress(fp):
     assert header[:4] == b'LZKJ'
     assert header[0xc:0xe] == b'LZ'   # 'CP' also supported by the game
     compressed_len, uncompressed_len, name_len = struct.unpack('<LLL', header[0x10:0x1c])
-    name_align = (name_len+3) & ~3
+    name_align = (name_len+4) & ~3
     name = fp.read(name_align)[:name_len]
     print('decompressing:', name.decode('ascii'))
 
