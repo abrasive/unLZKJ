@@ -89,6 +89,7 @@ def lz_decompress(fp):
 
 def archive_decompress(filename):
     with open(filename, 'rb') as fp:
+        print("unarchiving", fp.name)
         header_len = struct.unpack('<L', fp.read(4))[0]
         offsets = [header_len]
         while fp.tell() < header_len:
