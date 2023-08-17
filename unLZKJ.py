@@ -5,14 +5,9 @@ import struct
 def lz_init_tab():
     tab = []
 
-    for r5 in range(0x10):
-        r6 = r5
-        r6 <<= 4
-        r3 = r5
-        r6 += r3
-
-        for r4 in range(0x100):
-            tab.append(r6 & 0xff)
+    for base in range(0x10):
+        for _ in range(0x100):
+            tab.append(base * 0x11)
 
     return tab
 
