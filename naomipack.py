@@ -27,10 +27,11 @@ if __name__ == "__main__":
 
     realfp = open(sys.argv[2], mode)
     clearfp = frobgd.CryptFilter(realfp, key)
-    isofp = frobgd.RemapFilter(clearfp, 0x800000)
 
     if clearfp.read(8) != b'NAOMI   ':
         print("\n*** WARNING: encryption key doesn't seem right? Attempting to continue...\n")
+
+    isofp = frobgd.RemapFilter(clearfp, 0x800000)
 
     iso = pycdlib.PyCdlib()
     iso.open_fp(isofp)
