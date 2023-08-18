@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import pycdlib  # pypi: pycdlib
-import des  # pypi: des
+from Crypto.Cipher import DES  # pypi: pycryptodome
 from io import BytesIO
 import os
 import sys
 import pathlib
 
-class RemapFp(object):
+class RemapFilter(object):
     "Remap sectors from a gd-rom fp so an ISO reader can handle it"
     def __init__(self, fp, file_offset=0):
         self.fp = fp
@@ -15,6 +15,7 @@ class RemapFp(object):
 
         self.fp.seek(0, os.SEEK_END)
         self.file_size = self.fp.tell()
+        self.seek(0)
 
     def seek(self, offset, whence=0):
         if whence == os.SEEK_SET:
@@ -45,27 +46,119 @@ class RemapFp(object):
         self.offset += n
         return n
 
-class EncryptedFp(object):
-    "Apply en/decryption while reading/writing a file at some offset"
-    def __init__(self, fp, key_ascii, offset=0):
+class CryptFilter(object):
+    "Apply en/decryption while reading/writing a file"
+    def __init__(self, fp, key_bytes: bytes):
         self.fp = fp
-        self.des = des.DesKey(bytes.fromhex(key_ascii)[::-1])
-        self.file_offset = offset
-        self.fp.seek(offset)
+        assert len(key_bytes) == 8
+        self.des = DES.new(key_bytes[::-1], DES.MODE_ECB)
 
-        raise NotImplementedError() # XXX
+    def seek(self, offset, whence=0):
+        if offset & 7:
+            raise NotImplementedError()
+        self.fp.seek(offset, whence)
 
+    def tell(self):
+        return self.fp.tell()
+
+    def read(self, count):
+        out = b''
+        for _ in range((count + 7) // 8):
+            out += self.des.decrypt(self.fp.read(8)[::-1])[::-1]
+        out = out[:count]
+        assert len(out) == count
+        return out
+
+    def write(self, data):
+        if len(data) & 7:
+            raise NotImplementedError()
+        ndone = len(data)
+
+        while len(data):
+            encrypted = self.des.encrypt(data[:8][::-1])[::-1]
+            self.fp.write(encrypted)
+            data = data[8:]
+
+        return ndone
+
+class SectorSizeFilter(object):
+    "Read/write a file with 2352-byte sectors. Does not update EDC/ECC data."
+    def __init__(self, fp, file_offset=0):
+        self.fp = fp
+        self.file_offset = file_offset
+        self.seek(0)
+
+    def seek(self, offset, whence=0):
+        sector = offset // 2048
+        inside = offset % 2048
+
+        if whence == os.SEEK_SET:
+            real_offset = sector * 2352 + 16 + inside
+            self.fp.seek(real_offset + self.file_offset)
+            assert self.tell() == offset
+
+        elif whence == os.SEEK_CUR:
+            if inside != 0:
+                raise NotImplementedError()
+            self.fp.seek(sector * 2352, os.SEEK_CUR)
+            return
+
+        elif whence == os.SEEK_END:
+            if offset != 0:
+                raise NotImplementedError()
+            self.fp.seek(offset, os.SEEK_END)
+
+        else:
+            raise NotImplementedError()
+
+    def tell(self):
+        real_offset = self.fp.tell() - self.file_offset
+        sector = real_offset // 2352
+        inside = (real_offset % 2352) - 16
+        return sector * 2048 + inside
+
+    def read(self, count):
+        out = b''
+        sector_remain = 2048 - (self.tell() % 2048)
+        read = min(count, sector_remain)
+        out += self.fp.read(read)
+        self.fp.seek(2352 - 2048, os.SEEK_CUR)
+        count -= read
+
+        while count:
+            read = min(count, 2048)
+            out += self.fp.read(read)
+            self.fp.seek(2352 - 2048, os.SEEK_CUR)
+            count -= read
+
+        return out
+
+    def write(self, data):
+        ndone = len(data)
+
+        sector_remain = 2048 - (self.tell() % 2048)
+        write = min(len(data), sector_remain)
+        done = self.fp.write(data[:write])
+        self.fp.seek(2352 - 2048, os.SEEK_CUR)
+        data = data[done:]
+
+        while len(data):
+            write = min(len(data), 2048)
+            done = self.fp.write(data[:write])
+            self.fp.seek(2352 - 2048, os.SEEK_CUR)
+            data = data[done:]
+
+        return ndone
 
 def unpack(iso, rootdir: pathlib.Path, iso_path=''):
     for child in iso.list_children(iso_path=iso_path + '/'):
         filename = child.file_identifier().decode('ascii')
-        print(iso_path + '/' + filename)
-
         if child.is_dir() and filename not in ['', '.', '..']:
             (rootdir / filename).mkdir(exist_ok=True)
             unpack(iso, rootdir / filename, iso_path + '/' + filename)
 
         elif child.is_file():
+            print(iso_path + '/' + filename)
             with (rootdir / filename[:-2]).open('wb') as fp:
                 iso.get_file_from_iso_fp(fp, iso_path=iso_path + '/' + filename)
 
@@ -95,26 +188,3 @@ def repack(iso, rootdir: pathlib.Path, iso_path=''):
                 iso.modify_file_in_place(fp, size, isop)
 
             print('Updated', iso_path + '/' + filename[:-2])
-
-if __name__ == "__main__":
-    if len(sys.argv) != 4 or sys.argv[1] not in ["unpack", "repack"]:
-        print(f"usage: {sys.argv[0]} [unpack|repack] file.iso rootdir")
-        sys.exit(1)
-
-    if sys.argv[1] == 'unpack':
-        op = unpack
-        mode = 'rb'
-    else:
-        op = repack
-        mode = 'r+b'
-
-    realfp = open(sys.argv[2], mode)
-    fakefp = RemapFp(realfp, 0x800000)
-
-    iso = pycdlib.PyCdlib()
-    iso.open_fp(fakefp)
-
-    rootdir = pathlib.Path(sys.argv[3])
-    rootdir.mkdir(exist_ok=True)
-
-    op(iso, rootdir)
