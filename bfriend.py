@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""
+Updates the CRC in a Naomi info file.
+
+This usually has a three-letter name eg. BFR.BIN.
+(In real hardware this name matches the code in the PIC that supplies the
+decryption key.)
+"""
 
 import sys
 import os
@@ -68,7 +75,7 @@ def crc32(data, crc=0xffffffff):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print(f"usage: {sys.argv[0]} BFR.BIN")
+        print(f"usage: {sys.argv[0]} XXX.BIN")
         sys.exit(1)
 
     bfr = pathlib.Path(sys.argv[1])
