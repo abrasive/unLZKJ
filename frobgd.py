@@ -70,8 +70,12 @@ class CryptFilter(object):
         return out
 
     def write(self, data):
-        if len(data) & 7:
+        if self.tell() & 7:
             raise NotImplementedError()
+
+        while len(data) & 7:
+            data += b'\0'
+
         ndone = len(data)
 
         while len(data):
