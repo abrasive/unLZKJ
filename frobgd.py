@@ -162,7 +162,7 @@ def unpack(iso, rootdir: pathlib.Path, iso_path=''):
             unpack(iso, rootdir / filename, iso_path + '/' + filename)
 
         elif child.is_file():
-            print(iso_path + '/' + filename)
+            print('Unpacking', iso_path + '/' + filename)
             with (rootdir / filename[:-2]).open('wb') as fp:
                 iso.get_file_from_iso_fp(fp, iso_path=iso_path + '/' + filename)
 

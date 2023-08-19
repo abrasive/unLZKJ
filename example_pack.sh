@@ -1,11 +1,19 @@
 #!/bin/sh
 
-CHD=gdl-0018.chd
-INFO=BFR.BIN
-PAYLOAD=AZUPB.BIN
-KEY=B5673138E69798A2
+# Example for how to use the unpacking tools.
+# Expects a MAME-style source with ROM in gamename.zip and CHD in
+# gamename/gdl-xxxx.chd.  If you already know the encryption key and info
+# filename you can skip the zip and set KEY=, INFO= and CHD= yourself.
+
+# Azumanga Daioh Puzzle Bobble is our example
+GAME=azumanga
 WORKDIR=unpacked
-REPACK_LZ=0 # it's very slow, you probably don't want to do this automatically
+
+# get INFO and KEY
+eval $(./dump_naomi_rom.py $GAME.zip)
+CHD=$(ls $GAME/)
+
+REPACK_LZ=0 # azumanga specific - repack the .pvr files into .bin files? it's very slow, you probably don't want to do this automatically
 
 set -euo pipefail
 
@@ -33,14 +41,16 @@ then
     done
 fi
 
-echo Repacking $PAYLOAD...
-./naomipack.py repack "$WORKDIR/disc/$PAYLOAD" "$WORKDIR/naomi" $KEY
+# get GAMEFILE
+eval $(./bfriend.py dump "$WORKDIR/disc/$INFO")
 
-./bfriend.py "$WORKDIR/disc/$INFO"
+echo Repacking $GAMEFILE...
+./naomipack.py repack "$WORKDIR/disc/$GAMEFILE" "$WORKDIR/naomi" $KEY
+
+./bfriend.py update "$WORKDIR/disc/$INFO"
 
 echo Repacking disc.gdi...
 ./gdipack.py repack "$WORKDIR/disc.gdi" "$WORKDIR/disc"
 
 # chdman needs to be on your PATH
-chdman createcd -i "$WORKDIR/disc.gdi" -o "patched-$CHD" -f
-
+chdman createcd -i "$WORKDIR/disc.gdi" -o "azumanga/$CHD" -f

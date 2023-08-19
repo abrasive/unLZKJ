@@ -1,10 +1,17 @@
 #!/bin/sh
 
-CHD=gdl-0018.chd
-INFO=BFR.BIN
-PAYLOAD=AZUPB.BIN
-KEY=B5673138E69798A2
+# Example for how to use the unpacking tools.
+# Expects a MAME-style source with ROM in gamename.zip and CHD in
+# gamename/gdl-xxxx.chd.  If you already know the encryption key and info
+# filename you can skip the zip and set KEY=, INFO= and CHD= yourself.
+
+# Azumanga Daioh Puzzle Bobble is our example
+GAME=azumanga
 WORKDIR=unpacked
+
+# get INFO and KEY
+eval $(./dump_naomi_rom.py $GAME.zip)
+CHD=$(ls $GAME/)
 
 set -euo pipefail
 
@@ -24,9 +31,12 @@ chdman extractcd -i "$CHD" -o "$WORKDIR/disc.gdi" -f
 
 ./gdipack.py unpack "$WORKDIR/disc.gdi" "$WORKDIR/disc"
 
-./naomipack.py unpack "$WORKDIR/disc/$PAYLOAD" "$WORKDIR/naomi" $KEY
+# get GAMEFILE (in azumanga this is AZUPB.BIN)
+eval $(./bfriend.py dump "$WORKDIR/disc/$INFO")
 
-# this particular game has lots of LZKJ'd textures, so do them here
+./naomipack.py unpack "$WORKDIR/disc/$GAMEFILE" "$WORKDIR/naomi" $KEY
+
+# azumanga in particular has lots of LZKJ'd textures, so unpack them here
 IFS="
 "
 

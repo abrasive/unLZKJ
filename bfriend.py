@@ -74,35 +74,40 @@ def crc32(data, crc=0xffffffff):
     return crc
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(f"usage: {sys.argv[0]} XXX.BIN")
+    if len(sys.argv) != 3:
+        print(f"usage: {sys.argv[0]} [dump|update] XXX.BIN")
         sys.exit(1)
 
-    bfr = pathlib.Path(sys.argv[1])
+    bfr = pathlib.Path(sys.argv[2])
 
     fp = bfr.open('r+b')
     fp.seek(0xc0)
     filename = fp.read(0x20).rstrip(b'\0').decode('ascii')
-    print('Checksumming', filename)
 
-    datafp = (bfr.parent / filename).open('rb')
-    datafp.seek(0, os.SEEK_END)
-    datasize = datafp.tell()
-    datafp.seek(0)
+    if sys.argv[1] == 'update':
+        print('Checksumming', filename)
 
-    crc = crc32([])
-    t = tqdm.tqdm(total=datasize, unit='byte', unit_scale=1, unit_divisor=1024)
-    while chunk := datafp.read(1024):
-        crc = crc32(chunk, crc)
-        t.update(len(chunk))
-    t.close()
+        datafp = (bfr.parent / filename).open('rb')
+        datafp.seek(0, os.SEEK_END)
+        datasize = datafp.tell()
+        datafp.seek(0)
 
-    print('CRC: %x' % crc)
+        crc = crc32([])
+        t = tqdm.tqdm(total=datasize, unit='byte', unit_scale=1, unit_divisor=1024)
+        while chunk := datafp.read(1024):
+            crc = crc32(chunk, crc)
+            t.update(len(chunk))
+        t.close()
 
-    fp.seek(0xc)
-    fp.write(struct.pack('<L', crc))
+        print('CRC: %x' % crc)
 
-    # set the flag to skip checking the BIOS file is at the very end of the disc
-    # this permits reauthoring the ISO using other tools
-    fp.seek(0x14)
-    fp.write(b'\xff')
+        fp.seek(0xc)
+        fp.write(struct.pack('<L', crc))
+
+        # set the flag to skip checking the BIOS file is at the very end of the disc
+        # this permits reauthoring the ISO using other tools
+        fp.seek(0x14)
+        fp.write(b'\xff')
+
+    else:
+        print('GAMEFILE=' + filename)
